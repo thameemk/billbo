@@ -60,12 +60,11 @@ class WorkspaceMember(TimestampMixin, Base):
 
 class UserSession(TimestampMixin, Base):
     __tablename__ = "user_sessions"
-    __table_args__ = (Index("ix_user_sessions_user_id", "user_id"),)
+    __table_args__ = (Index("ix_user_sessions_user_id_expires_at", "user_id", "expires_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="sessions")
