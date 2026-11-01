@@ -5,7 +5,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     read_only: true
     tmpfs: [ /tmp ]
     cap_drop: [ ALL ]
