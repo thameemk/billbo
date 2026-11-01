@@ -44,6 +44,17 @@ class UserCreate(BaseModel):
         return value or None
 
 
+class LoginRequest(BaseModel):
+    # No min_length: password policy applies at signup, not login
+    email: str = Field(max_length=320)
+    password: str = Field(max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_user_email(cls, value: str) -> str:
+        return normalize_email(value)
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -72,7 +83,7 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/auth/login", status_code=status.HTTP_204_NO_CONTENT)
-def login(payload: UserCreate, response: Response, db: Session = Depends(get_db)) -> None:
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> None:
     try:
         user = authenticate_user(db, email=payload.email, password=payload.password)
     except InvalidCredentialsError:
