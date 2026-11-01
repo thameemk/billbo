@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.identity import User, UserSession
 
 password_hash = PasswordHash.recommended()
+_dummy_hash = password_hash.hash("timing-equalizer")
 session_lifetime = timedelta(minutes=30)
 
 
@@ -62,7 +63,11 @@ def register_user(
 
 def authenticate_user(db: Session, *, email: str, password: str) -> User:
     user = db.scalar(select(User).where(func.lower(User.email) == normalize_email(email)))
-    if user is None or not password_hash.verify(password, user.password_hash):
+    if user is None:
+        # same argon2 cost as a real check, so response time doesn't reveal unknown emails
+        password_hash.verify(password, _dummy_hash)
+        raise InvalidCredentialsError
+    if not password_hash.verify(password, user.password_hash):
         raise InvalidCredentialsError
     if not user.is_active:
         raise InactiveUserError
