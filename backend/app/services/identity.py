@@ -106,6 +106,16 @@ def get_valid_session(db: Session, *, token: str) -> UserSession:
     return session
 
 
+def extend_session(db: Session, *, session: UserSession) -> bool:
+    """Slide expiry forward once past half its lifetime, so active users stay logged in."""
+    now = datetime.now(timezone.utc)
+    if session.expires_at - now >= session_lifetime / 2:
+        return False
+    session.expires_at = now + session_lifetime
+    db.commit()
+    return True
+
+
 def revoke_session(db: Session, *, session: UserSession) -> None:
     db.delete(session)
     db.commit()

@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import SESSION_COOKIE, get_current_session, get_current_user
+from app.api.dependencies import (
+    SESSION_COOKIE,
+    get_current_session,
+    get_current_user,
+    set_session_cookie,
+)
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.identity import User, UserSession
@@ -18,7 +23,6 @@ from app.services.identity import (
     create_session,
     normalize_email,
     revoke_session,
-    session_lifetime,
 )
 from app.services.identity import register_user as register_user_service
 
@@ -93,15 +97,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         ) from None
     except InactiveUserError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
-    # SameSite=Strict: never sent on cross-site requests, which is the CSRF defence
-    response.set_cookie(
-        SESSION_COOKIE,
-        create_session(db, user=user),
-        max_age=int(session_lifetime.total_seconds()),
-        httponly=True,
-        secure=get_settings().cookie_secure,
-        samesite="strict",
-    )
+    set_session_cookie(response, create_session(db, user=user))
 
 
 @router.get("/users/me", response_model=UserResponse)
