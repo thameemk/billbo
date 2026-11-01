@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_session, get_current_user
+from app.api.dependencies import SESSION_COOKIE, get_current_session, get_current_user
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.identity import User, UserSession
@@ -18,6 +18,7 @@ from app.services.identity import (
     create_session,
     normalize_email,
     revoke_session,
+    session_lifetime,
 )
 from app.services.identity import register_user as register_user_service
 
@@ -52,11 +53,6 @@ class UserResponse(BaseModel):
     is_active: bool
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     if not get_settings().allow_signup:
@@ -75,19 +71,26 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
         ) from None
 
 
-@router.post("/auth/login", response_model=TokenResponse)
-def login(payload: UserCreate, db: Session = Depends(get_db)) -> TokenResponse:
+@router.post("/auth/login", status_code=status.HTTP_204_NO_CONTENT)
+def login(payload: UserCreate, response: Response, db: Session = Depends(get_db)) -> None:
     try:
         user = authenticate_user(db, email=payload.email, password=payload.password)
     except InvalidCredentialsError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
         ) from None
     except InactiveUserError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
-    return TokenResponse(access_token=create_session(db, user=user))
+    # SameSite=Strict: never sent on cross-site requests, which is the CSRF defence
+    response.set_cookie(
+        SESSION_COOKIE,
+        create_session(db, user=user),
+        max_age=int(session_lifetime.total_seconds()),
+        httponly=True,
+        secure=get_settings().cookie_secure,
+        samesite="strict",
+    )
 
 
 @router.get("/users/me", response_model=UserResponse)
@@ -97,7 +100,11 @@ def read_current_user(user: User = Depends(get_current_user)) -> User:
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
+    response: Response,
     session: UserSession = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> None:
     revoke_session(db, session=session)
+    response.delete_cookie(
+        SESSION_COOKIE, httponly=True, secure=get_settings().cookie_secure, samesite="strict"
+    )

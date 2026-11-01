@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     database_url: str
     cors_origins: str
     allow_signup: bool = False
+    # Secure session cookie (HTTPS only); set false only when serving over plain HTTP
+    cookie_secure: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:
