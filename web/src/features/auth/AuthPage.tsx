@@ -3,7 +3,7 @@ import {Avatar, Box, Button, Container, TextField, Typography} from "@mui/materi
 import {useState, type FormEvent} from "react";
 import * as api from "../../api/auth.ts";
 
-export function AuthPage({onToken}: { onToken: (t: string) => void }) {
+export function AuthPage({onLogin}: { onLogin: () => void }) {
     const [mode, setMode] = useState<"login" | "register">("login");
     const [err, setErr] = useState("");
     const [busy, setBusy] = useState(false);
@@ -16,7 +16,8 @@ export function AuthPage({onToken}: { onToken: (t: string) => void }) {
         setErr("");
         try {
             if (mode === "register") await api.register(name, email, pw);
-            onToken(await api.login(email, pw));
+            await api.login(email, pw);
+            onLogin();
         } catch (x) {
             setErr((x as Error).message);
         } finally {

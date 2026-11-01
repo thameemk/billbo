@@ -1,6 +1,6 @@
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
-// Called when an authenticated request gets a 401 (session expired or revoked).
+// Called when a request gets a 401 (session expired or revoked).
 let onUnauthorized = () => {};
 export const setUnauthorizedHandler = (fn: () => void) => {
     onUnauthorized = fn;
@@ -14,24 +14,26 @@ function message(detail: unknown): string {
     return "Request failed";
 }
 
-async function request<T>(method: string, path: string, body?: unknown, token?: string): Promise<T> {
+// the session lives in an httpOnly cookie the browser attaches; scripts never see it
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await fetch(BASE + path, {
         method,
-        headers: {"Content-Type": "application/json", ...(token && {Authorization: `Bearer ${token}`})},
+        credentials: "include",
+        headers: {"Content-Type": "application/json"},
         body: body === undefined ? undefined : JSON.stringify(body),
     }).catch(() => {
         throw new Error("Can't reach the server");
     });
-    if (res.status === 401 && token) onUnauthorized();
+    if (res.status === 401) onUnauthorized();
     if (!res.ok) throw new Error(message((await res.json().catch(() => null))?.detail));
     return res.status === 204 ? (undefined as T) : res.json();
 }
 
-export const post = <T>(path: string, body: unknown, token?: string) => request<T>("POST", path, body, token);
-export const put = <T>(path: string, body: unknown, token?: string) => request<T>("PUT", path, body, token);
-export const patch = <T>(path: string, body: unknown, token?: string) => request<T>("PATCH", path, body, token);
-export const get = <T>(path: string, token: string) => request<T>("GET", path, undefined, token);
-export const del = (path: string, token: string) => request<void>("DELETE", path, undefined, token);
+export const post = <T>(path: string, body: unknown) => request<T>("POST", path, body);
+export const put = <T>(path: string, body: unknown) => request<T>("PUT", path, body);
+export const patch = <T>(path: string, body: unknown) => request<T>("PATCH", path, body);
+export const get = <T>(path: string) => request<T>("GET", path);
+export const del = (path: string) => request<void>("DELETE", path);
 
 export type Page<T> = { items: T[]; next_cursor: string | null };
 

@@ -8,14 +8,14 @@ const toGroup = (g: ApiGroup): Group => ({
     cents: Math.round(Number(g.total_amount ?? 0) * 100), count: g.expense_count ?? 0,
 });
 
-export const listGroups = (token: string, cursor?: string) =>
-    get<Page<ApiGroup>>(`/groups?${qs({cursor})}`, token)
+export const listGroups = (cursor?: string) =>
+    get<Page<ApiGroup>>(`/groups?${qs({cursor})}`)
         .then((p) => ({...p, items: p.items.map(toGroup)}));
 
-export const createGroup = (token: string, name: string, currency: string) =>
-    post<ApiGroup>("/groups", {name, currency}, token).then(toGroup);
+export const createGroup = (name: string, currency: string) =>
+    post<ApiGroup>("/groups", {name, currency}).then(toGroup);
 
-export const updateGroup = (token: string, id: string, d: { name: string; currency: string }) =>
-    patch<ApiGroup>(`/groups/${id}`, d, token).then(toGroup);
+export const updateGroup = (id: string, d: { name: string; currency: string }) =>
+    patch<ApiGroup>(`/groups/${id}`, d).then(toGroup);
 
-export const deleteGroup = (token: string, id: string) => del(`/groups/${id}`, token);
+export const deleteGroup = (id: string) => del(`/groups/${id}`);

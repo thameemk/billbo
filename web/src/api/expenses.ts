@@ -12,18 +12,18 @@ const toExpense = (e: ApiExpense): Expense => ({
 // tags are sent as names; the server creates the missing ones
 export type ExpenseDraft = Omit<Expense, "id" | "updatedAt" | "group" | "tags"> & { tags: string[] };
 
-export const listExpenses = (token: string, groupId: string | undefined, q: string, tagId: string | undefined, cursor?: string) =>
-    get<Page<ApiExpense>>(`/expenses?${qs({group_id: groupId, q: q || undefined, tag_id: tagId, include: groupId ? undefined : "group", cursor})}`, token)
+export const listExpenses = (groupId: string | undefined, q: string, tagId: string | undefined, cursor?: string) =>
+    get<Page<ApiExpense>>(`/expenses?${qs({group_id: groupId, q: q || undefined, tag_id: tagId, include: groupId ? undefined : "group", cursor})}`)
         .then((p) => ({...p, items: p.items.map(toExpense)}));
 
-export const createExpense = (token: string, d: ExpenseDraft) =>
+export const createExpense = (d: ExpenseDraft) =>
     post<ApiExpense>("/expenses", {
         group_id: d.groupId, description: d.description, amount: (d.cents / 100).toFixed(2), date: d.date, tags: d.tags,
-    }, token).then(toExpense);
+    }).then(toExpense);
 
-export const updateExpense = (token: string, id: string, d: ExpenseDraft) =>
+export const updateExpense = (id: string, d: ExpenseDraft) =>
     put<ApiExpense>(`/expenses/${id}`, {
         description: d.description, amount: (d.cents / 100).toFixed(2), date: d.date, tags: d.tags,
-    }, token).then(toExpense);
+    }).then(toExpense);
 
-export const deleteExpense = (token: string, id: string) => del(`/expenses/${id}`, token);
+export const deleteExpense = (id: string) => del(`/expenses/${id}`);

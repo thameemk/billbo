@@ -18,21 +18,22 @@ import {usePaged} from "./lib/usePaged.ts";
 import {theme} from "./theme.ts";
 
 export default function App() {
-    const [token, setToken] = useStored<string | null>("token", null);
-    useEffect(() => setUnauthorizedHandler(() => setToken(null)), [setToken]);
+    // only whether we think a session exists; the token itself is an httpOnly cookie
+    const [signedIn, setSignedIn] = useStored("signedIn", false);
+    useEffect(() => setUnauthorizedHandler(() => setSignedIn(false)), [setSignedIn]);
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline/>
-            {token ? <Main token={token} onLogout={() => {
-                auth.logout(token).catch(() => {
+            {signedIn ? <Main onLogout={() => {
+                auth.logout().catch(() => {
                 });
-                setToken(null);
-            }}/> : <AuthPage onToken={setToken}/>}
+                setSignedIn(false);
+            }}/> : <AuthPage onLogin={() => setSignedIn(true)}/>}
         </ThemeProvider>
     );
 }
 
-function Main({token, onLogout}: { token: string; onLogout: () => void }) {
+function Main({onLogout}: { onLogout: () => void }) {
     const [open, setOpen] = useState<string | null>(null);
     const [profile, setProfile] = useState(false);
     const [creating, setCreating] = useState(false);
@@ -41,13 +42,13 @@ function Main({token, onLogout}: { token: string; onLogout: () => void }) {
     const [query, setQuery] = useState("");
     const [tag, setTag] = useState<string | null>(null); // tag view: expenses with this tag across groups
     const [toast, setToast] = useState("");
-    const groups = usePaged((c) => groupsApi.listGroups(token, c), token);
-    const expenses = usePaged((c) => expensesApi.listExpenses(token, open ?? undefined, query, tag ?? undefined, c), `${open ?? "all"}|${tag}|${query}`);
+    const groups = usePaged((c) => groupsApi.listGroups(c), "groups");
+    const expenses = usePaged((c) => expensesApi.listExpenses(open ?? undefined, query, tag ?? undefined, c), `${open ?? "all"}|${tag}|${query}`);
     const [tags, setTags] = useState<Tag[]>([]); // the user's existing tags, offered as suggestions
     useEffect(() => {
-        tagsApi.listTags(token).then(setTags, () => {
+        tagsApi.listTags().then(setTags, () => {
         });
-    }, [token]);
+    }, []);
     const addTags = (e: Expense) => setTags((ts) => {
         const have = new Set(ts.map((t) => t.id));
         return [...ts, ...e.tags.filter((t) => !have.has(t.id))].sort((a, b) => a.name.localeCompare(b.name));
@@ -71,7 +72,7 @@ function Main({token, onLogout}: { token: string; onLogout: () => void }) {
                 onProfile={profile ? undefined : () => setProfile(true)}
             >
                 {profile ? (
-                    <ProfilePage token={token} groups={groups.items} expenses={expenses.items}
+                    <ProfilePage groups={groups.items} expenses={expenses.items}
                                  onLogout={() => {
                                      onLogout();
                                      setOpen(null);
@@ -79,17 +80,17 @@ function Main({token, onLogout}: { token: string; onLogout: () => void }) {
                                  }}/>
                 ) : (
                     <GroupPage g={g} onQuery={setQuery} expenses={expenses.items} paging={expenses} tags={tagNames}
-                               onAdd={(d) => expensesApi.createExpense(token, d).then((e) => {
+                               onAdd={(d) => expensesApi.createExpense(d).then((e) => {
                                    addTags(e);
                                    expenses.setItems((xs) => [e, ...xs]);
                                    setToast("Expense added");
                                })}
-                               onEdit={(id, d) => expensesApi.updateExpense(token, id, d).then((e) => {
+                               onEdit={(id, d) => expensesApi.updateExpense(id, d).then((e) => {
                                    addTags(e);
                                    expenses.setItems((xs) => xs.map((x) => (x.id === id ? {...e, group: x.group} : x)));
                                    setToast("Expense updated");
                                })}
-                               onDelete={(id) => expensesApi.deleteExpense(token, id).then(() => {
+                               onDelete={(id) => expensesApi.deleteExpense(id).then(() => {
                                    expenses.setItems((xs) => xs.filter((e) => e.id !== id));
                                    setToast("Expense deleted");
                                }, fail)}/>
@@ -97,14 +98,14 @@ function Main({token, onLogout}: { token: string; onLogout: () => void }) {
             </AppShell>
             {groupDialog && <GroupDialog group={groupDialog} onClose={() => setGroupDialog(null)}
                                           onDelete={async () => {
-                                              await groupsApi.deleteGroup(token, groupDialog.id);
+                                              await groupsApi.deleteGroup(groupDialog.id);
                                               groups.setItems((xs) => xs.filter((x) => x.id !== groupDialog.id));
                                               expenses.setItems((xs) => xs.filter((x) => x.groupId !== groupDialog.id));
                                               if (open === groupDialog.id) setOpen(null);
                                               setGroupDialog(null);
                                               setToast("Group deleted");
                                           }} onSave={async (d) => {
-                const saved = await groupsApi.updateGroup(token, groupDialog.id, d);
+                const saved = await groupsApi.updateGroup(groupDialog.id, d);
                 groups.setItems((xs) => xs.map((x) => (x.id === saved.id ? {...x, name: saved.name, currency: saved.currency} : x)));
                 // rows in the all-expenses view carry their group's name and currency
                 expenses.setItems((xs) => xs.map((x) => (x.groupId === saved.id && x.group ? {...x, group: {name: saved.name, currency: saved.currency}} : x)));
@@ -114,7 +115,7 @@ function Main({token, onLogout}: { token: string; onLogout: () => void }) {
                                       onClose={() => setTagDialog(null)}
                                       onDelete={tagDialog.tag ? async () => {
                                           const id = tagDialog.tag!.id;
-                                          await tagsApi.deleteTag(token, id);
+                                          await tagsApi.deleteTag(id);
                                           setTags((ts) => ts.filter((x) => x.id !== id));
                                           expenses.setItems((xs) => xs.map((x) => ({...x, tags: x.tags.filter((y) => y.id !== id)})));
                                           if (tag === id) setTag(null);
@@ -123,14 +124,14 @@ function Main({token, onLogout}: { token: string; onLogout: () => void }) {
                                       } : undefined}
                                       onSave={async (name) => {
                 const t = tagDialog.tag;
-                const saved = t ? await tagsApi.updateTag(token, t.id, name) : await tagsApi.createTag(token, name);
+                const saved = t ? await tagsApi.updateTag(t.id, name) : await tagsApi.createTag(name);
                 setTags((ts) => [...ts.filter((x) => x.id !== saved.id), saved].sort((a, b) => a.name.localeCompare(b.name)));
                 // listed expenses still carry the old name
                 expenses.setItems((xs) => xs.map((x) => ({...x, tags: x.tags.map((y) => (y.id === saved.id ? saved : y))})));
                 setTagDialog(null);
             }}/>}
             {creating && <GroupDialog onClose={() => setCreating(false)} onSave={async (d) => {
-                const gr = await groupsApi.createGroup(token, d.name, d.currency);
+                const gr = await groupsApi.createGroup(d.name, d.currency);
                 groups.setItems((xs) => [gr, ...xs]);
                 setOpen(gr.id);
                 setTag(null);

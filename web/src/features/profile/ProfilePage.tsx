@@ -4,14 +4,14 @@ import {useEffect, useState} from "react";
 import * as auth from "../../api/auth.ts";
 import {fmt, total, type Expense, type Group} from "../../lib/money.ts";
 
-export function ProfilePage({token, groups, expenses, onLogout}: {
-    token: string; groups: Group[]; expenses: Expense[]; onLogout: () => void;
+export function ProfilePage({groups, expenses, onLogout}: {
+    groups: Group[]; expenses: Expense[]; onLogout: () => void;
 }) {
     const [user, setUser] = useState<auth.User | null>(null);
     const [err, setErr] = useState("");
     useEffect(() => {
-        auth.me(token).then(setUser).catch((e: Error) => setErr(e.message));
-    }, [token]);
+        auth.me().then(setUser).catch((e: Error) => setErr(e.message));
+    }, []);
 
     const name = user?.display_name || user?.email.split("@")[0] || "";
     const stats: [string, string][] = [
