@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from pwdlib import PasswordHash
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -80,6 +80,9 @@ def hash_session_token(token: str) -> str:
 
 def create_session(db: Session, *, user: User) -> str:
     token = secrets.token_urlsafe(32)
+    # purges every user's expired sessions on login,
+    # move to a scheduled job if login latency suffers
+    db.execute(delete(UserSession).where(UserSession.expires_at <= datetime.now(timezone.utc)))
     db.add(
         UserSession(
             user_id=user.id,
@@ -95,7 +98,6 @@ def get_valid_session(db: Session, *, token: str) -> UserSession:
     session = db.scalar(
         select(UserSession).where(
             UserSession.token_hash == hash_session_token(token),
-            UserSession.revoked_at.is_(None),
             UserSession.expires_at > datetime.now(timezone.utc),
         )
     )
@@ -105,5 +107,5 @@ def get_valid_session(db: Session, *, token: str) -> UserSession:
 
 
 def revoke_session(db: Session, *, session: UserSession) -> None:
-    session.revoked_at = datetime.now(timezone.utc)
+    db.delete(session)
     db.commit()
