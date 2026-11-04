@@ -24,7 +24,8 @@ router = APIRouter(prefix="/api/v1/expenses", tags=["expenses"])
 class ExpenseUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    description: str = Field(min_length=1, max_length=255)
+    title: str = Field(min_length=1, max_length=255)
+    notes: str | None = Field(default=None, max_length=2000)
     amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     date: Date
     tags: list[Annotated[str, Field(min_length=1, max_length=30)]] = Field(default=[], max_length=10)
@@ -53,7 +54,8 @@ class ExpenseResponse(BaseModel):
 
     id: UUID
     group_id: UUID
-    description: str
+    title: str
+    notes: str | None
     amount: Decimal
     date: Date
     tags: list[TagResponse]
@@ -68,7 +70,8 @@ def to_response(expense: Expense, with_group: bool = False) -> ExpenseResponse:
     return ExpenseResponse(
         id=expense.id,
         group_id=expense.group_id,
-        description=expense.description,
+        title=expense.title,
+        notes=expense.notes,
         amount=expense.amount,
         date=expense.date,
         tags=[TagResponse.model_validate(t) for t in expense.tags],
@@ -100,7 +103,7 @@ def create_expense(
 def list_expenses(
     group_id: UUID | None = None,
     tag_id: UUID | None = None,
-    q: str | None = Query(None, max_length=100),  # matches description or tag name
+    q: str | None = Query(None, max_length=100),  # matches title or tag name
     include: Literal["group"] | None = None,
     cursor: str | None = None,
     limit: int = Query(20, ge=1, le=100),
@@ -119,7 +122,7 @@ def list_expenses(
     if q and q.strip():
         q = q.strip()
         stmt = stmt.where(
-            Expense.description.icontains(q, autoescape=True)
+            Expense.title.icontains(q, autoescape=True)
             | Expense.tags.any(Tag.name.icontains(q, autoescape=True))
         )
     page = paginate(db, stmt, (Expense.date, Expense.created_at), Expense, cursor, limit)

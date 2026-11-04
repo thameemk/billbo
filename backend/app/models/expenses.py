@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Table,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -66,7 +67,8 @@ class Expense(TimestampMixin, Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     group_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
-    description: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(String(255))
+    notes: Mapped[str | None] = mapped_column(Text)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     date: Mapped[dt_date]
 
