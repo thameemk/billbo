@@ -2,9 +2,9 @@ import {del, get, post, put, qs, type Page} from "./client.ts";
 import type {Expense, Tag} from "../lib/money.ts";
 
 // the API sends amount as a decimal string ("12.50"); the UI works in integer cents
-type ApiExpense = { id: string; group_id: string; description: string; amount: string; date: string; tags: Tag[]; updated_at: string; group?: { name: string; currency: string } };
+type ApiExpense = { id: string; group_id: string; title: string; notes: string | null; amount: string; date: string; tags: Tag[]; updated_at: string; group?: { name: string; currency: string } };
 const toExpense = (e: ApiExpense): Expense => ({
-    id: e.id, groupId: e.group_id, description: e.description,
+    id: e.id, groupId: e.group_id, title: e.title, notes: e.notes,
     cents: Math.round(Number(e.amount) * 100), date: e.date, tags: e.tags, updatedAt: e.updated_at,
     group: e.group && {name: e.group.name, currency: e.group.currency},
 });
@@ -18,12 +18,12 @@ export const listExpenses = (groupId: string | undefined, q: string, tagId: stri
 
 export const createExpense = (d: ExpenseDraft) =>
     post<ApiExpense>("/expenses", {
-        group_id: d.groupId, description: d.description, amount: (d.cents / 100).toFixed(2), date: d.date, tags: d.tags,
+        group_id: d.groupId, title: d.title, notes: d.notes, amount: (d.cents / 100).toFixed(2), date: d.date, tags: d.tags,
     }).then(toExpense);
 
 export const updateExpense = (id: string, d: ExpenseDraft) =>
     put<ApiExpense>(`/expenses/${id}`, {
-        description: d.description, amount: (d.cents / 100).toFixed(2), date: d.date, tags: d.tags,
+        title: d.title, notes: d.notes, amount: (d.cents / 100).toFixed(2), date: d.date, tags: d.tags,
     }).then(toExpense);
 
 export const deleteExpense = (id: string) => del(`/expenses/${id}`);

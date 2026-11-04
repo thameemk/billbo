@@ -31,7 +31,7 @@ export function GroupPage({g, expenses, onQuery, onAdd, onEdit, onDelete, paging
                 <Typography variant="body2" color="text.secondary">Total spent</Typography>
                 <Typography variant="h4" fontWeight={700}>{fmt(total(mine), g.currency)}</Typography>
             </Box>}
-            <TextField size="small" fullWidth placeholder="Search description or tag" value={search}
+            <TextField size="small" fullWidth placeholder="Search title or tag" value={search}
                        onChange={(e) => setSearch(e.target.value)} sx={{mb: 2, "& .MuiOutlinedInput-root": {bgcolor: "background.paper", borderRadius: 999}}}
                        slotProps={{
                            htmlInput: {"aria-label": "Search expenses"},

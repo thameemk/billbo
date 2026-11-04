@@ -71,15 +71,15 @@ export function ExpenseList({expenses, currency, loading, searching, onEdit, onD
                             <Box key={e.id}>
                                 {i > 0 && <Divider component="li"/>}
                                 <ListItem disablePadding sx={{"&:hover .actions, &:focus-within .actions": {opacity: 1}}}
-                                          secondaryAction={<IconButton className="actions" size="small" edge="end" color="error" aria-label={`Delete ${e.description}`}
+                                          secondaryAction={<IconButton className="actions" size="small" edge="end" color="error" aria-label={`Delete ${e.title}`}
                                                                        sx={{"@media (hover: hover)": {opacity: 0}}}
                                                                        disabled={deleting.has(e.id)} onClick={() => setConfirm(e)}><DeleteOutlineIcon fontSize="small"/></IconButton>}>
-                                <ListItemButton onClick={() => onEdit(e)} aria-label={`Edit ${e.description}`} sx={{py: 0.5, px: {xs: 1.5, sm: 2}, pr: 6}}>
+                                <ListItemButton onClick={() => onEdit(e)} aria-label={`Edit ${e.title}`} sx={{py: 0.5, px: {xs: 1.5, sm: 2}, pr: 6}}>
                                     <Box sx={{width: 32, mr: 1.5, textAlign: "center", lineHeight: 1, color: "text.secondary"}}>
                                         <Typography variant="caption" sx={{textTransform: "uppercase"}}>{part(e.date, {month: "short"})}</Typography>
                                         <Typography component="div" fontWeight={500}>{part(e.date, {day: "numeric"})}</Typography>
                                     </Box>
-                                    <ListItemText primary={e.description}
+                                    <ListItemText primary={e.title}
                                                   secondary={(e.group || e.tags.length > 0) && <>
                                                       {e.group && <Chip label={e.group.name} size="small" variant="outlined" sx={{mr: 0.5, mt: 0.25, height: 20, fontSize: 11, color: colorOf(e.groupId), borderColor: colorOf(e.groupId)}}/>}
                                                       {e.tags.map((t) => <Chip key={t.id} label={t.name} size="small" sx={{mr: 0.5, mt: 0.25, height: 20, fontSize: 11, color: colorOf(t.id), bgcolor: `${colorOf(t.id)}22`}}/>)}
@@ -98,7 +98,7 @@ export function ExpenseList({expenses, currency, loading, searching, onEdit, onD
                 <DialogTitle>Delete expense?</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        “{confirm?.description}” will be permanently deleted.
+                        “{confirm?.title}” will be permanently deleted.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions sx={{px: 3, pb: 2}}>

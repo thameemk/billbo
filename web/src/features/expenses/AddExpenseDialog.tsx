@@ -18,10 +18,10 @@ export function AddExpenseDialog({groupId, currency, expense, suggestions, onSav
     return (
         <FormDialog title={expense ? "Edit expense" : "Add expense"} submitLabel="Save" onClose={onClose}
                     onSubmit={(f) => onSave({
-                        groupId, description: String(f.get("desc")).trim(),
+                        groupId, title: String(f.get("title")).trim(), notes: String(f.get("notes")).trim() || null,
                         cents: Math.round(Number(f.get("amount")) * 100), date: String(f.get("date")), tags,
                     })}>
-            <TextField name="desc" label="Description" defaultValue={expense?.description} required autoFocus/>
+            <TextField name="title" label="Title" defaultValue={expense?.title} required autoFocus/>
             <TextField name="amount" label="Amount" type="number" defaultValue={expense && expense.cents / 100} required
                        slotProps={{
                            htmlInput: {min: 0.01, step: 0.01, inputMode: "decimal"},
@@ -29,6 +29,8 @@ export function AddExpenseDialog({groupId, currency, expense, suggestions, onSav
                        }}/>
             <TextField name="date" label="Date" type="date" defaultValue={expense?.date ?? today()} required
                        slotProps={{inputLabel: {shrink: true}}}/>
+            <TextField name="notes" label="Notes" defaultValue={expense?.notes ?? ""} multiline minRows={2}
+                       slotProps={{htmlInput: {maxLength: 2000}}}/>
             <Autocomplete multiple freeSolo options={suggestions} value={tags} onChange={(_, v) => setTags(v)}
                           autoSelect slotProps={{chip: {size: "small"}}}
                           renderInput={(params) => <TextField {...params} label="Tags" helperText="Type and press Enter"/>}/>
