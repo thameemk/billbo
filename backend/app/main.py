@@ -9,11 +9,11 @@ from app.api.tags import router as tags_router
 from app.api.users import router as users_router
 from app.core.config import get_settings
 
-api_version = version("personal-expense-manager")
+api_version = version("billbo")
 settings = get_settings()
 
 app = FastAPI(
-    title="Personal Expense Manager API",
+    title="Billbo API",
     version=api_version,
 )
 app.add_middleware(

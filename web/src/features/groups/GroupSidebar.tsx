@@ -29,7 +29,7 @@ export function GroupSidebar({groups, selected, tags, selectedTag, onSelect, onA
 }) {
     return (
         <>
-            <Typography variant="h6" fontWeight={700} sx={{px: 2.5, pt: 2.5, pb: 1}}>Expense Manager</Typography>
+            <Typography variant="h6" fontWeight={700} sx={{px: 2.5, pt: 2.5, pb: 1}}>Billbo</Typography>
             <List dense sx={{py: 1}}>
                 <ListItemButton sx={item} selected={selected === null && selectedTag === null} onClick={() => onSelect(null)}>
                     <ListItemIcon sx={{minWidth: 36, color: "text.primary"}}><ReceiptLongIcon fontSize="small"/></ListItemIcon>

@@ -1,8 +1,8 @@
-# Personal Expense Manager
+# Billbo
 
 💸 Self-hosted expense manager: track spending by group and tag. FastAPI + React + PostgreSQL, 🐳 Docker-ready.
 
-![Expense Manager showing a group's total spent and its expenses by month](docs/images/web_group_expense.png)
+![Billbo showing a group's total spent and its expenses by month](docs/images/web_group_expense.png)
 
 ## Why
 

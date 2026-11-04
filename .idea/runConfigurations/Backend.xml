@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Backend" type="Python.FastAPI">
     <option name="file" value="$PROJECT_DIR$/backend/app/main.py" />
-    <module name="personal-expense-manager" />
+    <module name="billbo" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />

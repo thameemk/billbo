@@ -1,7 +1,7 @@
 [project]
-name = "personal-expense-manager"
+name = "billbo"
 version = "0.1.0"
-description = "Personal expense manager API"
+description = "Billbo expense manager API"
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.13,<2.0",
