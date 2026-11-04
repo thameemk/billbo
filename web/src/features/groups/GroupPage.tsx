@@ -7,7 +7,7 @@ import {AddExpenseDialog} from "../expenses/AddExpenseDialog.tsx";
 import {InfiniteScroll} from "../../components/InfiniteScroll.tsx";
 import type {ExpenseDraft} from "../../api/expenses.ts";
 import {ExpenseList} from "../expenses/ExpenseList.tsx";
-import {fmt, total, type Expense, type Group} from "../../lib/money.ts";
+import {fmt, type Expense, type Group} from "../../lib/money.ts";
 
 export function GroupPage({g, expenses, onQuery, onAdd, onEdit, onDelete, paging, tags}: {
     g?: Group; // undefined = all expenses across groups
@@ -29,7 +29,7 @@ export function GroupPage({g, expenses, onQuery, onAdd, onEdit, onDelete, paging
         <>
             {g && <Box sx={{mb: 2}}>
                 <Typography variant="body2" color="text.secondary">Total spent</Typography>
-                <Typography variant="h4" fontWeight={700}>{fmt(total(mine), g.currency)}</Typography>
+                <Typography variant="h4" fontWeight={700}>{fmt(g.cents, g.currency)}</Typography>
             </Box>}
             <TextField size="small" fullWidth placeholder="Search title or tag" value={search}
                        onChange={(e) => setSearch(e.target.value)} sx={{mb: 2, "& .MuiOutlinedInput-root": {bgcolor: "background.paper", borderRadius: 999}}}
