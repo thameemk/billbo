@@ -2,10 +2,10 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import {Avatar, Box, Button, Card, CardContent, Divider, Stack, Typography} from "@mui/material";
 import {useEffect, useState} from "react";
 import * as auth from "../../api/auth.ts";
-import {fmt, total, type Expense, type Group} from "../../lib/money.ts";
+import {fmt, type Group} from "../../lib/money.ts";
 
-export function ProfilePage({groups, expenses, onLogout}: {
-    groups: Group[]; expenses: Expense[]; onLogout: () => void;
+export function ProfilePage({groups, onLogout}: {
+    groups: Group[]; onLogout: () => void;
 }) {
     const [user, setUser] = useState<auth.User | null>(null);
     const [err, setErr] = useState("");
@@ -14,10 +14,13 @@ export function ProfilePage({groups, expenses, onLogout}: {
     }, []);
 
     const name = user?.display_name || user?.email.split("@")[0] || "";
+    // one figure per currency: amounts in different currencies can't be added together
+    const totals = new Map<string, number>();
+    for (const g of groups) totals.set(g.currency, (totals.get(g.currency) ?? 0) + g.cents);
     const stats: [string, string][] = [
         ["Groups", String(groups.length)],
-        ["Expenses", String(expenses.length)],
-        ["Total spent", fmt(total(expenses))],
+        ["Expenses", String(groups.reduce((n, g) => n + g.count, 0))],
+        ["Total spent", [...totals].map(([currency, cents]) => fmt(cents, currency)).join(" · ") || fmt(0)],
     ];
     return (
         <Stack spacing={3} alignItems="center">

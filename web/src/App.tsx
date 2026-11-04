@@ -56,6 +56,9 @@ function Main({onLogout}: { onLogout: () => void }) {
     const g = groups.items.find((x) => x.id === open);
     const tagNames = tags.map((t) => t.name);
     const fail = (e: unknown) => setToast((e as Error).message);
+    // keep the group totals current without refetching
+    const adjustGroup = (id: string, cents: number, count = 0) =>
+        groups.setItems((xs) => xs.map((x) => (x.id === id ? {...x, cents: x.cents + cents, count: x.count + count} : x)));
 
     return (
         <>
@@ -72,7 +75,7 @@ function Main({onLogout}: { onLogout: () => void }) {
                 onProfile={profile ? undefined : () => setProfile(true)}
             >
                 {profile ? (
-                    <ProfilePage groups={groups.items} expenses={expenses.items}
+                    <ProfilePage groups={groups.items}
                                  onLogout={() => {
                                      onLogout();
                                      setOpen(null);
@@ -82,15 +85,19 @@ function Main({onLogout}: { onLogout: () => void }) {
                     <GroupPage g={g} onQuery={setQuery} expenses={expenses.items} paging={expenses} tags={tagNames}
                                onAdd={(d) => expensesApi.createExpense(d).then((e) => {
                                    addTags(e);
+                                   adjustGroup(e.groupId, e.cents, 1);
                                    expenses.setItems((xs) => [e, ...xs]);
                                    setToast("Expense added");
                                })}
                                onEdit={(id, d) => expensesApi.updateExpense(id, d).then((e) => {
                                    addTags(e);
+                                   adjustGroup(e.groupId, e.cents - (expenses.items.find((x) => x.id === id)?.cents ?? e.cents));
                                    expenses.setItems((xs) => xs.map((x) => (x.id === id ? {...e, group: x.group} : x)));
                                    setToast("Expense updated");
                                })}
                                onDelete={(id) => expensesApi.deleteExpense(id).then(() => {
+                                   const gone = expenses.items.find((e) => e.id === id);
+                                   if (gone) adjustGroup(gone.groupId, -gone.cents, -1);
                                    expenses.setItems((xs) => xs.filter((e) => e.id !== id));
                                    setToast("Expense deleted");
                                }, fail)}/>

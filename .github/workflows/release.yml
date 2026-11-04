@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v, e.g. 0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Check version format
+        run: echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+
+      # updates pyproject.toml and uv.lock together
+      - name: Set version
+        run: uv version "$VERSION" --no-sync --directory backend
+
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git diff --quiet || git commit -am "chore (release) : v$VERSION"
+          git tag -a "v$VERSION" -m "Billbo v$VERSION"
+          git push origin main "v$VERSION"
+
+      - name: Create GitHub release
+        run: gh release create "v$VERSION" --verify-tag --title "Billbo v$VERSION" --generate-notes
