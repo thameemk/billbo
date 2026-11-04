@@ -18,10 +18,10 @@ export function AddExpenseDialog({groupId, currency, expense, suggestions, onSav
     return (
         <FormDialog title={expense ? "Edit expense" : "Add expense"} submitLabel="Save" onClose={onClose}
                     onSubmit={(f) => onSave({
-                        groupId, description: String(f.get("desc")).trim(),
+                        groupId, title: String(f.get("title")).trim(),
                         cents: Math.round(Number(f.get("amount")) * 100), date: String(f.get("date")), tags,
                     })}>
-            <TextField name="desc" label="Description" defaultValue={expense?.description} required autoFocus/>
+            <TextField name="title" label="Title" defaultValue={expense?.title} required autoFocus/>
             <TextField name="amount" label="Amount" type="number" defaultValue={expense && expense.cents / 100} required
                        slotProps={{
                            htmlInput: {min: 0.01, step: 0.01, inputMode: "decimal"},
