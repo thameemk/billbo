@@ -1,6 +1,6 @@
 export type Tag = { id: string; name: string };
 
-export type Expense = { id: string; groupId: string; title: string; cents: number; date: string; tags: Tag[]; updatedAt: string; group?: { name: string; currency: string } };
+export type Expense = { id: string; groupId: string; title: string; notes: string | null; cents: number; date: string; tags: Tag[]; updatedAt: string; group?: { name: string; currency: string } };
 
 export type Group = { id: string; name: string; currency: string; cents: number; count: number };
 
