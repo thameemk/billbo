@@ -9,8 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "Expense Manager",
-        short_name: "Expenses",
+        name: "Billbo",
+        short_name: "Billbo",
         display: "standalone",
         theme_color: "#1f2937",
         background_color: "#ffffff",
