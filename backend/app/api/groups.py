@@ -78,7 +78,10 @@ def create_group(
 
 @router.patch("/{group_id}", response_model=GroupResponse)
 def update_group(
-    group_id: UUID, payload: GroupUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    group_id: UUID,
+    payload: GroupUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> Group:
     group = get_owned_group(group_id, user, db)
     for field, value in payload.model_dump(exclude_none=True).items():
@@ -127,6 +130,8 @@ def list_groups(
 
 
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_group(group_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+def delete_group(
+    group_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> None:
     db.delete(get_owned_group(group_id, user, db))  # its expenses go with it
     db.commit()

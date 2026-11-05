@@ -28,7 +28,9 @@ class ExpenseUpdate(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
     amount: Decimal = Field(max_digits=12, decimal_places=2)  # positive = debit, negative = credit
     date: Date
-    tags: list[Annotated[str, Field(min_length=1, max_length=30)]] = Field(default=[], max_length=10)
+    tags: list[Annotated[str, Field(min_length=1, max_length=30)]] = Field(
+        default=[], max_length=10
+    )
 
     @field_validator("amount")
     @classmethod
@@ -48,7 +50,10 @@ class ExpenseUpdate(BaseModel):
 
 def set_tags(expense: Expense, names: list[str], user: User, db: Session) -> None:
     """Point the expense at the caller's tags with these names, creating the missing ones."""
-    found = {t.name: t for t in db.scalars(select(Tag).where(Tag.owner_id == user.id, Tag.name.in_(names)))}
+    found = {
+        t.name: t
+        for t in db.scalars(select(Tag).where(Tag.owner_id == user.id, Tag.name.in_(names)))
+    }
     expense.tags = [found.get(n) or Tag(owner_id=user.id, name=n) for n in names]
 
 

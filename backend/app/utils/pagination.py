@@ -29,7 +29,10 @@ def paginate(db: Session, stmt: Select, sort_cols: tuple, model, cursor: str | N
         try:
             *vals, row_id = json.loads(base64.urlsafe_b64decode(cursor))
             after = (
-                *(c.type.python_type.fromisoformat(v) for c, v in zip(sort_cols, vals, strict=True)),
+                *(
+                    c.type.python_type.fromisoformat(v)
+                    for c, v in zip(sort_cols, vals, strict=True)
+                ),
                 UUID(row_id),
             )
             stmt = stmt.where(tuple_(*keys) < after)

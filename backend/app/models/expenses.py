@@ -27,7 +27,9 @@ class Group(TimestampMixin, Base):
     __tablename__ = "groups"
     __table_args__ = (
         CheckConstraint("currency ~ '^[A-Z]{3}$'", name="ck_groups_currency_format"),
-        Index("ix_groups_owner_id_created_at", "owner_id", text("created_at DESC"), text("id DESC")),
+        Index(
+            "ix_groups_owner_id_created_at", "owner_id", text("created_at DESC"), text("id DESC")
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -73,4 +75,6 @@ class Expense(TimestampMixin, Base):
     date: Mapped[dt_date]
 
     group: Mapped["Group"] = relationship("Group", back_populates="expenses")
-    tags: Mapped[list[Tag]] = relationship(secondary=expense_tags, order_by=Tag.name, lazy="selectin")
+    tags: Mapped[list[Tag]] = relationship(
+        secondary=expense_tags, order_by=Tag.name, lazy="selectin"
+    )
