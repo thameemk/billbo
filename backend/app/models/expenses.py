@@ -61,7 +61,7 @@ expense_tags = Table(
 class Expense(TimestampMixin, Base):
     __tablename__ = "expenses"
     __table_args__ = (
-        CheckConstraint("amount > 0", name="ck_expenses_amount_positive"),
+        CheckConstraint("amount <> 0", name="ck_expenses_amount_nonzero"),
         Index("ix_expenses_group_id_date", "group_id", text("date DESC"), text("id DESC")),
     )
 
@@ -69,7 +69,7 @@ class Expense(TimestampMixin, Base):
     group_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(String(255))
     notes: Mapped[str | None] = mapped_column(Text)
-    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))  # positive = debit, negative = credit
     date: Mapped[dt_date]
 
     group: Mapped["Group"] = relationship("Group", back_populates="expenses")

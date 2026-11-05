@@ -26,9 +26,16 @@ class ExpenseUpdate(BaseModel):
 
     title: str = Field(min_length=1, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
-    amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+    amount: Decimal = Field(max_digits=12, decimal_places=2)  # positive = debit, negative = credit
     date: Date
     tags: list[Annotated[str, Field(min_length=1, max_length=30)]] = Field(default=[], max_length=10)
+
+    @field_validator("amount")
+    @classmethod
+    def check_amount(cls, amount: Decimal) -> Decimal:
+        if amount == 0:
+            raise ValueError("Amount must not be zero")
+        return amount
 
     @field_validator("tags", mode="before")
     @classmethod
