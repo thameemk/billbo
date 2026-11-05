@@ -1,4 +1,4 @@
-import {Autocomplete, InputAdornment, TextField, Typography} from "@mui/material";
+import {Autocomplete, InputAdornment, TextField, ToggleButton, ToggleButtonGroup, Typography} from "@mui/material";
 import {useState} from "react";
 import {FormDialog} from "../../components/FormDialog.tsx";
 import type {ExpenseDraft} from "../../api/expenses.ts";
@@ -15,14 +15,20 @@ export function AddExpenseDialog({groupId, currency, expense, suggestions, onSav
     onClose: () => void
 }) {
     const [tags, setTags] = useState<string[]>(expense?.tags.map((t) => t.name) ?? []);
+    const [kind, setKind] = useState<"debit" | "credit">(expense && expense.cents < 0 ? "credit" : "debit");
     return (
         <FormDialog title={expense ? "Edit expense" : "Add expense"} submitLabel="Save" onClose={onClose}
                     onSubmit={(f) => onSave({
                         groupId, title: String(f.get("title")).trim(), notes: String(f.get("notes")).trim() || null,
-                        cents: Math.round(Number(f.get("amount")) * 100), date: String(f.get("date")), tags,
+                        cents: (kind === "credit" ? -1 : 1) * Math.round(Number(f.get("amount")) * 100), date: String(f.get("date")), tags,
                     })}>
             <TextField name="title" label="Title" defaultValue={expense?.title} required autoFocus/>
-            <TextField name="amount" label="Amount" type="number" defaultValue={expense && expense.cents / 100} required
+            <ToggleButtonGroup exclusive fullWidth size="small" color="primary" aria-label="Entry type" value={kind}
+                               onChange={(_, v) => v && setKind(v)}>
+                <ToggleButton value="debit">Debit</ToggleButton>
+                <ToggleButton value="credit">Credit</ToggleButton>
+            </ToggleButtonGroup>
+            <TextField name="amount" label="Amount" type="number" defaultValue={expense && Math.abs(expense.cents) / 100} required
                        slotProps={{
                            htmlInput: {min: 0.01, step: 0.01, inputMode: "decimal"},
                            input: {startAdornment: <InputAdornment position="start">{currency}</InputAdornment>}

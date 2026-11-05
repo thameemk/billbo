@@ -20,7 +20,7 @@ import {
 import {useState} from "react";
 import {Empty} from "../../components/Empty.tsx";
 import {Section} from "../../components/Section.tsx";
-import {fmt, total, type Expense} from "../../lib/money.ts";
+import {fmt, fmtSigned, totals, type Expense} from "../../lib/money.ts";
 import {colorOf} from "../../lib/util.ts";
 
 const monthLabel = (ym: string) =>
@@ -64,8 +64,10 @@ export function ExpenseList({expenses, currency, loading, searching, onEdit, onD
         <>
             {byMonth(expenses).map(([ym, items]) => {
                 const currencies = new Set(items.map(cur)); // a month total only makes sense in one currency
+                const {spent, received} = totals(items);
+                const monthTotal = `${fmt(spent, cur(items[0]))}${received ? ` · ${fmtSigned(-received, cur(items[0]))}` : ""}`;
                 return (
-                <Section key={ym} title={currencies.size === 1 ? `${monthLabel(ym)} · ${fmt(total(items), cur(items[0]))}` : monthLabel(ym)}>
+                <Section key={ym} title={currencies.size === 1 ? `${monthLabel(ym)} · ${monthTotal}` : monthLabel(ym)}>
                     <List disablePadding>
                         {items.map((e, i) => (
                             <Box key={e.id}>
@@ -85,7 +87,7 @@ export function ExpenseList({expenses, currency, loading, searching, onEdit, onD
                                                       {e.tags.map((t) => <Chip key={t.id} label={t.name} size="small" sx={{mr: 0.5, mt: 0.25, height: 20, fontSize: 11, color: colorOf(t.id), bgcolor: `${colorOf(t.id)}22`}}/>)}
                                                   </>}
                                                   slotProps={{primary: {noWrap: true, fontWeight: 500}, secondary: {component: "div"}}} sx={{minWidth: 0}}/>
-                                    <Typography fontWeight={600} sx={{textAlign: "right", ml: 1, flexShrink: 0, fontVariantNumeric: "tabular-nums"}}>{fmt(e.cents, cur(e))}</Typography>
+                                    <Typography fontWeight={600} color={e.cents < 0 ? "success.main" : undefined} sx={{textAlign: "right", ml: 1, flexShrink: 0, fontVariantNumeric: "tabular-nums"}}>{fmtSigned(e.cents, cur(e))}</Typography>
                                 </ListItemButton>
                                 </ListItem>
                             </Box>

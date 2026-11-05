@@ -15,12 +15,16 @@ export function ProfilePage({groups, onLogout}: {
 
     const name = user?.display_name || user?.email.split("@")[0] || "";
     // one figure per currency: amounts in different currencies can't be added together
-    const totals = new Map<string, number>();
-    for (const g of groups) totals.set(g.currency, (totals.get(g.currency) ?? 0) + g.cents);
+    const perCurrency = (cents: (g: Group) => number) => {
+        const sums = new Map<string, number>();
+        for (const g of groups) sums.set(g.currency, (sums.get(g.currency) ?? 0) + cents(g));
+        return [...sums].map(([currency, sum]) => fmt(sum, currency)).join(" · ") || fmt(0);
+    };
     const stats: [string, string][] = [
         ["Groups", String(groups.length)],
         ["Expenses", String(groups.reduce((n, g) => n + g.count, 0))],
-        ["Total spent", [...totals].map(([currency, cents]) => fmt(cents, currency)).join(" · ") || fmt(0)],
+        ["Total spent", perCurrency((g) => g.spent)],
+        ["Total received", perCurrency((g) => g.received)],
     ];
     return (
         <Stack spacing={3} alignItems="center">
