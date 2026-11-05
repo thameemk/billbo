@@ -44,7 +44,9 @@ def ensure_name_free(name: str, user: User, db: Session) -> None:
 
 
 @router.post("", response_model=TagResponse, status_code=status.HTTP_201_CREATED)
-def create_tag(payload: TagBody, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Tag:
+def create_tag(
+    payload: TagBody, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> Tag:
     ensure_name_free(payload.name, user, db)
     tag = Tag(owner_id=user.id, name=payload.name)
     db.add(tag)
@@ -54,7 +56,10 @@ def create_tag(payload: TagBody, user: User = Depends(get_current_user), db: Ses
 
 @router.patch("/{tag_id}", response_model=TagResponse)
 def update_tag(
-    tag_id: UUID, payload: TagBody, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    tag_id: UUID,
+    payload: TagBody,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> Tag:
     tag = db.get(Tag, tag_id)
     if tag is None or tag.owner_id != user.id:
@@ -67,7 +72,9 @@ def update_tag(
 
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_tag(tag_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+def delete_tag(
+    tag_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> None:
     tag = db.get(Tag, tag_id)
     if tag is None or tag.owner_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")

@@ -54,7 +54,8 @@ class GroupResponse(BaseModel):
 
 
 class GroupSummary(GroupResponse):
-    total_amount: Decimal
+    total_debit: Decimal
+    total_credit: Decimal
     expense_count: int
 
 
@@ -77,7 +78,10 @@ def create_group(
 
 @router.patch("/{group_id}", response_model=GroupResponse)
 def update_group(
-    group_id: UUID, payload: GroupUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    group_id: UUID,
+    payload: GroupUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> Group:
     group = get_owned_group(group_id, user, db)
     for field, value in payload.model_dump(exclude_none=True).items():
@@ -98,19 +102,27 @@ def list_groups(
     ids = [g.id for g in page["items"]]
     rows = (
         db.execute(
-            select(Expense.group_id, func.sum(Expense.amount), func.count())
+            select(
+                Expense.group_id,
+                func.coalesce(func.sum(Expense.amount).filter(Expense.amount > 0), 0),
+                func.coalesce(-func.sum(Expense.amount).filter(Expense.amount < 0), 0),
+                func.count(),
+            )
             .where(Expense.group_id.in_(ids))
             .group_by(Expense.group_id)
         )
         if ids
         else []
     )
-    totals = {gid: (amount, count) for gid, amount, count in rows}
+    totals = {
+        gid: {"total_debit": debit, "total_credit": credit, "expense_count": count}
+        for gid, debit, credit, count in rows
+    }
+    no_expenses = {"total_debit": Decimal(0), "total_credit": Decimal(0), "expense_count": 0}
     page["items"] = [
         GroupSummary(
             **GroupResponse.model_validate(g).model_dump(),
-            total_amount=totals.get(g.id, (Decimal(0), 0))[0],
-            expense_count=totals.get(g.id, (Decimal(0), 0))[1],
+            **totals.get(g.id, no_expenses),
         )
         for g in page["items"]
     ]
@@ -118,6 +130,8 @@ def list_groups(
 
 
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_group(group_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+def delete_group(
+    group_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> None:
     db.delete(get_owned_group(group_id, user, db))  # its expenses go with it
     db.commit()

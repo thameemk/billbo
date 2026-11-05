@@ -27,9 +27,15 @@ export function GroupPage({g, expenses, onQuery, onAdd, onEdit, onDelete, paging
     const mine = (g ? expenses.filter((e) => e.groupId === g.id) : [...expenses]).sort((a, b) => b.date.localeCompare(a.date));
     return (
         <>
-            {g && <Box sx={{mb: 2}}>
-                <Typography variant="body2" color="text.secondary">Total spent</Typography>
-                <Typography variant="h4" fontWeight={700}>{fmt(g.cents, g.currency)}</Typography>
+            {g && <Box sx={{mb: 2, display: "flex", flexWrap: "wrap", columnGap: 4}}>
+                <Box>
+                    <Typography variant="body2" color="text.secondary">Spent</Typography>
+                    <Typography variant="h4" fontWeight={700}>{fmt(g.spent, g.currency)}</Typography>
+                </Box>
+                <Box>
+                    <Typography variant="body2" color="text.secondary">Received</Typography>
+                    <Typography variant="h4" fontWeight={700} color="success.main">{fmt(g.received, g.currency)}</Typography>
+                </Box>
             </Box>}
             <TextField size="small" fullWidth placeholder="Search title or tag" value={search}
                        onChange={(e) => setSearch(e.target.value)} sx={{mb: 2, "& .MuiOutlinedInput-root": {bgcolor: "background.paper", borderRadius: 999}}}
