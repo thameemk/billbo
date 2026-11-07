@@ -32,7 +32,7 @@ export function AuthPage({onLogin}: { onLogin: () => void }) {
                 <Box>
                     <Typography variant="h4"
                                 fontWeight={700}>{mode === "login" ? "Welcome back" : "Create account"}</Typography>
-                    <Typography color="text.secondary">Split expenses with friends, simply.</Typography>
+                    <Typography color="text.secondary">Track your spending by group and tag.</Typography>
                 </Box>
                 {mode === "register" && <TextField name="name" label="Your name"/>}
                 <TextField name="email" type="email" label="Email" required/>

@@ -18,7 +18,7 @@ backend/   FastAPI, SQLAlchemy, PostgreSQL, Alembic
 web/       React + Vite + TypeScript, Material UI
 ```
 
-Features: sign up / log in, expense groups, tags, an expense list with
+Features: sign up / log in, expense groups, tags, notes, an expense list with
 infinite scroll, and a profile page. The web app is an installable PWA (app
 shell cached; data needs the network). A native mobile client is not started.
 
@@ -35,7 +35,7 @@ uv run uvicorn app.main:app --reload
 ```
 
 Environment variables (see [`backend/.env.example`](backend/.env.example)):
-`DATABASE_URL`, `CORS_ORIGINS`, and `BACKEND_PORT` (docker compose only).
+`DATABASE_URL`, `CORS_ORIGINS`, `ALLOW_SIGNUP`, `COOKIE_SECURE`, and `BACKEND_PORT` (docker compose only).
 The API is served under `/api/v1`, with interactive docs at `/docs` and a
 health check at `/health`.
 
