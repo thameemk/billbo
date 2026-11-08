@@ -3,6 +3,7 @@ import {Avatar, Box, Button, Card, CardContent, Divider, Stack, Typography} from
 import {useEffect, useState} from "react";
 import * as auth from "../../api/auth.ts";
 import {fmt, type Group} from "../../lib/money.ts";
+import {version} from "../../../package.json";
 
 export function ProfilePage({groups, onLogout}: {
     groups: Group[]; onLogout: () => void;
@@ -53,6 +54,7 @@ export function ProfilePage({groups, onLogout}: {
                 </CardContent>
             </Card>
             <Button variant="outlined" color="error" startIcon={<LogoutIcon/>} onClick={onLogout}>Log out</Button>
+            <Typography variant="caption" color="text.secondary">Billbo v{version}</Typography>
         </Stack>
     );
 }

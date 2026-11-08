@@ -24,9 +24,11 @@ jobs:
       - name: Check version format
         run: echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
 
-      # updates pyproject.toml and uv.lock together
+      # updates pyproject.toml, uv.lock and web/package.json together
       - name: Set version
-        run: uv version "$VERSION" --no-sync --directory backend
+        run: |
+          uv version "$VERSION" --no-sync --directory backend
+          npm pkg set version="$VERSION" --prefix web
 
       - name: Commit and tag
         run: |
