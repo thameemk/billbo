@@ -7,18 +7,33 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, WithJsonSchema, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, contains_eager
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import NOT_FOUND, UNAUTHORIZED, get_current_user
 from app.api.groups import GroupResponse, get_owned_group
 from app.api.tags import TagResponse
 from app.db.session import get_db
 from app.models import Expense, Group, Tag, User
 from app.utils.pagination import Page, paginate
 
-router = APIRouter(prefix="/api/v1/expenses", tags=["expenses"])
+router = APIRouter(prefix="/api/v1/expenses", tags=["expenses"], responses=UNAUTHORIZED)
+
+
+def require_string(value):
+    # a JSON number would pass through a float; money travels as a string
+    if not isinstance(value, str):
+        raise ValueError('Send the amount as a string, e.g. "12.50"')
+    return value
+
+
+# positive = debit, negative = credit
+Amount = Annotated[
+    Decimal,
+    BeforeValidator(require_string),
+    WithJsonSchema({"type": "string", "examples": ["12.50"], "title": "Amount"}),
+]
 
 
 class ExpenseUpdate(BaseModel):
@@ -26,7 +41,7 @@ class ExpenseUpdate(BaseModel):
 
     title: str = Field(min_length=1, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
-    amount: Decimal = Field(max_digits=12, decimal_places=2)  # positive = debit, negative = credit
+    amount: Amount = Field(max_digits=12, decimal_places=2)
     date: Date
     tags: list[Annotated[str, Field(min_length=1, max_length=30)]] = Field(
         default=[], max_length=10
@@ -97,6 +112,7 @@ def to_response(expense: Expense, with_group: bool = False) -> ExpenseResponse:
     response_model=ExpenseResponse,
     response_model_exclude_unset=True,
     status_code=status.HTTP_201_CREATED,
+    responses=NOT_FOUND,
 )
 def create_expense(
     payload: ExpenseCreate,
@@ -130,7 +146,9 @@ def filtered(
     return stmt
 
 
-@router.get("", response_model=Page[ExpenseResponse], response_model_exclude_unset=True)
+@router.get(
+    "", response_model=Page[ExpenseResponse], response_model_exclude_unset=True, responses=NOT_FOUND
+)
 def list_expenses(
     group_id: UUID | None = None,
     tag_id: UUID | None = None,
@@ -150,24 +168,23 @@ def list_expenses(
 
 
 class MonthTotal(BaseModel):
-    month: str  # YYYY-MM
-    currency: str
-    spent: Decimal
-    received: Decimal
+    month: str = Field(pattern=r"^\d{4}-\d{2}$", description="YYYY-MM")
+    currency: str = Field(description="ISO 4217 code of the group the expenses belong to")
+    spent: Decimal = Field(description="Sum of debits")
+    received: Decimal = Field(description="Sum of credits, as a positive number")
 
 
 class MonthTotals(BaseModel):
     items: list[MonthTotal]
 
 
-@router.get("/monthly", response_model=MonthTotals)
+@router.get("/monthly", response_model=MonthTotals, responses=NOT_FOUND)
 def monthly_totals(
     group_id: UUID | None = None,
     tag_id: UUID | None = None,
     q: str | None = Query(None, max_length=100),
-    # [from, to): bounds the work to the months on screen
-    start: Date | None = Query(None, alias="from"),
-    end: Date | None = Query(None, alias="to"),
+    start: Date | None = Query(None, alias="from", description="Inclusive start date"),
+    end: Date | None = Query(None, alias="to", description="Exclusive end date"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -200,7 +217,12 @@ def get_owned_expense(expense_id: UUID, user: User, db: Session) -> Expense:
     return expense
 
 
-@router.put("/{expense_id}", response_model=ExpenseResponse, response_model_exclude_unset=True)
+@router.put(
+    "/{expense_id}",
+    response_model=ExpenseResponse,
+    response_model_exclude_unset=True,
+    responses=NOT_FOUND,
+)
 def update_expense(
     expense_id: UUID,
     payload: ExpenseUpdate,
@@ -216,7 +238,7 @@ def update_expense(
     return to_response(expense)
 
 
-@router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT, responses=NOT_FOUND)
 def delete_expense(
     expense_id: UUID,
     user: User = Depends(get_current_user),

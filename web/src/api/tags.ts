@@ -1,7 +1,7 @@
 import {del, get, patch, post} from "./client.ts";
 import type {Tag} from "../lib/money.ts";
 
-export const listTags = () => get<Tag[]>("/tags");
+export const listTags = () => get<{ items: Tag[] }>("/tags").then((r) => r.items);
 
 export const createTag = (name: string) => post<Tag>("/tags", {name});
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import Cookie, Depends, HTTPException, Response, status
+from fastapi import Depends, HTTPException, Response, status
+from fastapi.security import APIKeyCookie
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -15,6 +16,17 @@ from app.services.identity import (
 
 # httpOnly cookie holding the session token, so page scripts can't read it
 SESSION_COOKIE = "session"
+
+# declares cookie auth once in the docs, instead of a parameter on every route
+session_cookie = APIKeyCookie(
+    name=SESSION_COOKIE,
+    auto_error=False,  # get_current_session answers with a 401 of its own
+    description="httpOnly session cookie set by POST /auth/login",
+)
+
+# shared response docs
+UNAUTHORIZED = {401: {"description": "Missing, invalid or expired session"}}
+NOT_FOUND = {404: {"description": "Not found, or not owned by the caller"}}
 
 
 def set_session_cookie(response: Response, token: str) -> None:
@@ -31,7 +43,7 @@ def set_session_cookie(response: Response, token: str) -> None:
 
 def get_current_session(
     response: Response,
-    token: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+    token: str | None = Depends(session_cookie),
     db: Session = Depends(get_db),
 ) -> UserSession:
     try:
