@@ -4,6 +4,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import {Box, Fab, IconButton, InputAdornment, TextField, Typography} from "@mui/material";
 import {useEffect, useState} from "react";
 import {AddExpenseDialog} from "../expenses/AddExpenseDialog.tsx";
+import {Redacted} from "../../components/Redacted.tsx";
 import {InfiniteScroll} from "../../components/InfiniteScroll.tsx";
 import type {ExpenseDraft} from "../../api/expenses.ts";
 import {ExpenseList} from "../expenses/ExpenseList.tsx";
@@ -30,11 +31,11 @@ export function GroupPage({g, expenses, onQuery, onAdd, onEdit, onDelete, paging
             {g && <Box sx={{mb: 2, display: "flex", flexWrap: "wrap", columnGap: 4}}>
                 <Box>
                     <Typography variant="body2" color="text.secondary">Spent</Typography>
-                    <Typography variant="h4" fontWeight={700}>{fmt(g.spent, g.currency)}</Typography>
+                    <Typography variant="h4" fontWeight={700}><Redacted>{fmt(g.spent, g.currency)}</Redacted></Typography>
                 </Box>
                 <Box>
                     <Typography variant="body2" color="text.secondary">Received</Typography>
-                    <Typography variant="h4" fontWeight={700} color="success.main">{fmt(g.received, g.currency)}</Typography>
+                    <Typography variant="h4" fontWeight={700} color="success.main"><Redacted>{fmt(g.received, g.currency)}</Redacted></Typography>
                 </Box>
             </Box>}
             <TextField size="small" fullWidth placeholder="Search title or tag" value={search}
