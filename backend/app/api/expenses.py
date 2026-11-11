@@ -111,6 +111,25 @@ def create_expense(
     return to_response(expense)
 
 
+def filtered(
+    stmt, group_id: UUID | None, tag_id: UUID | None, q: str | None, user: User, db: Session
+):
+    if group_id:
+        get_owned_group(group_id, user, db)  # 404 unless it is the caller's group
+    stmt = stmt.join(Expense.group).where(Group.owner_id == user.id)
+    if group_id:
+        stmt = stmt.where(Expense.group_id == group_id)
+    if tag_id:
+        stmt = stmt.where(Expense.tags.any(Tag.id == tag_id))
+    if q and q.strip():
+        q = q.strip()
+        stmt = stmt.where(
+            Expense.title.icontains(q, autoescape=True)
+            | Expense.tags.any(Tag.name.icontains(q, autoescape=True))
+        )
+    return stmt
+
+
 @router.get("", response_model=Page[ExpenseResponse], response_model_exclude_unset=True)
 def list_expenses(
     group_id: UUID | None = None,
@@ -122,24 +141,52 @@ def list_expenses(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if group_id:
-        get_owned_group(group_id, user, db)  # 404 unless it is the caller's group
-    stmt = select(Expense).join(Expense.group).where(Group.owner_id == user.id)
+    stmt = filtered(select(Expense), group_id, tag_id, q, user, db)
     if include:
         stmt = stmt.options(contains_eager(Expense.group))
-    if group_id:
-        stmt = stmt.where(Expense.group_id == group_id)
-    if tag_id:
-        stmt = stmt.where(Expense.tags.any(Tag.id == tag_id))
-    if q and q.strip():
-        q = q.strip()
-        stmt = stmt.where(
-            Expense.title.icontains(q, autoescape=True)
-            | Expense.tags.any(Tag.name.icontains(q, autoescape=True))
-        )
     page = paginate(db, stmt, (Expense.date, Expense.created_at), Expense, cursor, limit)
     page["items"] = [to_response(e, with_group=bool(include)) for e in page["items"]]
     return page
+
+
+class MonthTotal(BaseModel):
+    month: str  # YYYY-MM
+    currency: str
+    spent: Decimal
+    received: Decimal
+
+
+class MonthTotals(BaseModel):
+    items: list[MonthTotal]
+
+
+@router.get("/monthly", response_model=MonthTotals)
+def monthly_totals(
+    group_id: UUID | None = None,
+    tag_id: UUID | None = None,
+    q: str | None = Query(None, max_length=100),
+    # [from, to): bounds the work to the months on screen
+    start: Date | None = Query(None, alias="from"),
+    end: Date | None = Query(None, alias="to"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Per-month totals over everything the filters match within [from, to), not just a page."""
+    month = func.to_char(Expense.date, "YYYY-MM")
+    spent = func.coalesce(func.sum(Expense.amount).filter(Expense.amount > 0), 0)
+    received = func.coalesce(-func.sum(Expense.amount).filter(Expense.amount < 0), 0)
+    stmt = filtered(
+        select(month, Group.currency, spent, received), group_id, tag_id, q, user, db
+    ).group_by(month, Group.currency)
+    if start:
+        stmt = stmt.where(Expense.date >= start)
+    if end:
+        stmt = stmt.where(Expense.date < end)
+    return {
+        "items": [
+            MonthTotal(month=m, currency=c, spent=s, received=r) for m, c, s, r in db.execute(stmt)
+        ]
+    }
 
 
 def get_owned_expense(expense_id: UUID, user: User, db: Session) -> Expense:
