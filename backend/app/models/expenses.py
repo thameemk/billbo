@@ -65,6 +65,9 @@ class Expense(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("amount <> 0", name="ck_expenses_amount_nonzero"),
         Index("ix_expenses_group_id_date", "group_id", text("date DESC"), text("id DESC")),
+        Index(
+            "ix_expenses_group_id_date_amount", "group_id", "date", postgresql_include=["amount"]
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
