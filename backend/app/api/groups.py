@@ -9,12 +9,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import NOT_FOUND, UNAUTHORIZED, get_current_user
 from app.db.session import get_db
 from app.models import Expense, Group, User
 from app.utils.pagination import Page, paginate
 
-router = APIRouter(prefix="/api/v1/groups", tags=["groups"])
+router = APIRouter(prefix="/api/v1/groups", tags=["groups"], responses=UNAUTHORIZED)
 
 
 def check_currency(value: str) -> str:
@@ -28,7 +28,7 @@ class GroupCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str = Field(min_length=1, max_length=120)
-    currency: str = "INR"  # ISO 4217
+    currency: str = Field("INR", min_length=3, max_length=3, description="ISO 4217 code, e.g. INR")
 
     _check_currency = field_validator("currency")(check_currency)
 
@@ -37,7 +37,12 @@ class GroupUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str | None = Field(None, min_length=1, max_length=120)
-    currency: str | None = None  # relabels the amounts, nothing is converted
+    currency: str | None = Field(
+        None,
+        min_length=3,
+        max_length=3,
+        description="ISO 4217 code; relabels the amounts, nothing is converted",
+    )
 
     @field_validator("currency")
     @classmethod
@@ -54,8 +59,8 @@ class GroupResponse(BaseModel):
 
 
 class GroupSummary(GroupResponse):
-    total_debit: Decimal
-    total_credit: Decimal
+    spent: Decimal = Field(description="Sum of debits")
+    received: Decimal = Field(description="Sum of credits, as a positive number")
     expense_count: int
 
 
@@ -76,7 +81,7 @@ def create_group(
     return group
 
 
-@router.patch("/{group_id}", response_model=GroupResponse)
+@router.patch("/{group_id}", response_model=GroupResponse, responses=NOT_FOUND)
 def update_group(
     group_id: UUID,
     payload: GroupUpdate,
@@ -115,10 +120,10 @@ def list_groups(
         else []
     )
     totals = {
-        gid: {"total_debit": debit, "total_credit": credit, "expense_count": count}
+        gid: {"spent": debit, "received": credit, "expense_count": count}
         for gid, debit, credit, count in rows
     }
-    no_expenses = {"total_debit": Decimal(0), "total_credit": Decimal(0), "expense_count": 0}
+    no_expenses = {"spent": Decimal(0), "received": Decimal(0), "expense_count": 0}
     page["items"] = [
         GroupSummary(
             **GroupResponse.model_validate(g).model_dump(),
@@ -129,7 +134,7 @@ def list_groups(
     return page
 
 
-@router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT, responses=NOT_FOUND)
 def delete_group(
     group_id: UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> None:

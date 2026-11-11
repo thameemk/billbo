@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import (
     SESSION_COOKIE,
+    UNAUTHORIZED,
     get_current_session,
     get_current_user,
     set_session_cookie,
@@ -68,7 +69,15 @@ class UserResponse(BaseModel):
     is_active: bool
 
 
-@router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/users",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        403: {"description": "Signups are disabled"},
+        409: {"description": "An account with that email already exists"},
+    },
+)
 def register_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     if not get_settings().allow_signup:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Signups are disabled")
@@ -86,7 +95,23 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
         ) from None
 
 
-@router.post("/auth/login", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/auth/login",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {
+            "description": "Signed in; the session cookie is set",
+            "headers": {
+                "Set-Cookie": {
+                    "description": "httpOnly, SameSite=Strict session cookie",
+                    "schema": {"type": "string"},
+                }
+            },
+        },
+        401: {"description": "Invalid email or password"},
+        403: {"description": "User is inactive"},
+    },
+)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> None:
     try:
         user = authenticate_user(db, email=payload.email, password=payload.password)
@@ -100,12 +125,12 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
     set_session_cookie(response, create_session(db, user=user))
 
 
-@router.get("/users/me", response_model=UserResponse)
+@router.get("/users/me", response_model=UserResponse, responses=UNAUTHORIZED)
 def read_current_user(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-@router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, responses=UNAUTHORIZED)
 def logout(
     response: Response,
     session: UserSession = Depends(get_current_session),
