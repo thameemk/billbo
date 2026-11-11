@@ -6,13 +6,13 @@ import {useEffect, useState} from "react";
 import {AddExpenseDialog} from "../expenses/AddExpenseDialog.tsx";
 import {Redacted} from "../../components/Redacted.tsx";
 import {InfiniteScroll} from "../../components/InfiniteScroll.tsx";
-import type {ExpenseDraft} from "../../api/expenses.ts";
+import type {ExpenseDraft, MonthTotal} from "../../api/expenses.ts";
 import {ExpenseList} from "../expenses/ExpenseList.tsx";
 import {fmt, type Expense, type Group} from "../../lib/money.ts";
 
-export function GroupPage({g, expenses, onQuery, onAdd, onEdit, onDelete, paging, tags}: {
+export function GroupPage({g, expenses, months, onQuery, onAdd, onEdit, onDelete, paging, tags}: {
     g?: Group; // undefined = all expenses across groups
-    expenses: Expense[]; onAdd: (e: ExpenseDraft) => void | Promise<void>; onEdit: (id: string, e: ExpenseDraft) => void | Promise<void>;
+    expenses: Expense[]; months: MonthTotal[]; onAdd: (e: ExpenseDraft) => void | Promise<void>; onEdit: (id: string, e: ExpenseDraft) => void | Promise<void>;
     onDelete: (id: string) => void | Promise<void>;
     onQuery: (q: string) => void; // called once typing pauses
     tags: string[];
@@ -49,7 +49,7 @@ export function GroupPage({g, expenses, onQuery, onAdd, onEdit, onDelete, paging
                                </InputAdornment>
                            }
                        }}/>
-            <ExpenseList searching={!!search.trim()} expenses={mine} currency={g?.currency} loading={paging.loading || !!paging.error} onEdit={setEditing} onDelete={onDelete}/>
+            <ExpenseList months={months} searching={!!search.trim()} expenses={mine} currency={g?.currency} loading={paging.loading || !!paging.error} onEdit={setEditing} onDelete={onDelete}/>
             <InfiniteScroll onMore={paging.loadMore} onRetry={paging.retry} hasMore={paging.hasMore} loading={paging.loading} count={expenses.length} error={paging.error}/>
             <Box sx={{height: 72}}/>
             {g && <Fab color="primary" variant="extended" onClick={() => setAdding(true)}

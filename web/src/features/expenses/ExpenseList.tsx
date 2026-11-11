@@ -20,7 +20,8 @@ import {
 import {useState} from "react";
 import {Empty} from "../../components/Empty.tsx";
 import {Section} from "../../components/Section.tsx";
-import {fmt, fmtSigned, totals, type Expense} from "../../lib/money.ts";
+import type {MonthTotal} from "../../api/expenses.ts";
+import {fmt, fmtSigned, type Expense} from "../../lib/money.ts";
 import {colorOf} from "../../lib/util.ts";
 
 const monthLabel = (ym: string) =>
@@ -36,8 +37,8 @@ function byMonth(expenses: Expense[]): [string, Expense[]][] {
     return [...months];
 }
 
-export function ExpenseList({expenses, currency, loading, searching, onEdit, onDelete}: {
-    expenses: Expense[]; currency?: string; loading: boolean; searching?: boolean; onEdit: (e: Expense) => void; onDelete: (id: string) => void | Promise<void>
+export function ExpenseList({expenses, months, currency, loading, searching, onEdit, onDelete}: {
+    expenses: Expense[]; months: MonthTotal[]; currency?: string; loading: boolean; searching?: boolean; onEdit: (e: Expense) => void; onDelete: (id: string) => void | Promise<void>
 }) {
     const cur = (e: Expense) => e.group?.currency ?? currency;
     const [confirm, setConfirm] = useState<Expense | null>(null);
@@ -63,11 +64,11 @@ export function ExpenseList({expenses, currency, loading, searching, onEdit, onD
     return (
         <>
             {byMonth(expenses).map(([ym, items]) => {
-                const currencies = new Set(items.map(cur)); // a month total only makes sense in one currency
-                const {spent, received} = totals(items);
-                const monthTotal = `${fmt(spent, cur(items[0]))}${received ? ` · ${fmtSigned(-received, cur(items[0]))}` : ""}`;
+                const rows = months.filter((m) => m.month === ym); // a month total only makes sense in one currency
+                const t = rows.length === 1 ? rows[0] : undefined;
+                const monthTotal = t && `${fmt(t.spent, t.currency)}${t.received ? ` · ${fmtSigned(-t.received, t.currency)}` : ""}`;
                 return (
-                <Section key={ym} title={currencies.size === 1 ? `${monthLabel(ym)} · ${monthTotal}` : monthLabel(ym)}>
+                <Section key={ym} title={monthTotal ? `${monthLabel(ym)} · ${monthTotal}` : monthLabel(ym)}>
                     <List disablePadding>
                         {items.map((e, i) => (
                             <Box key={e.id}>

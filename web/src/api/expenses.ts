@@ -16,6 +16,12 @@ export const listExpenses = (groupId: string | undefined, q: string, tagId: stri
     get<Page<ApiExpense>>(`/expenses?${qs({group_id: groupId, q: q || undefined, tag_id: tagId, include: groupId ? undefined : "group", cursor})}`)
         .then((p) => ({...p, items: p.items.map(toExpense)}));
 
+// whole-month totals for the same filters as the list, in cents; one entry per month and currency
+export type MonthTotal = { month: string; currency: string; spent: number; received: number };
+export const monthlyTotals = (groupId: string | undefined, q: string, tagId: string | undefined, from: string, to: string) =>
+    get<{ items: { month: string; currency: string; spent: string; received: string }[] }>(`/expenses/monthly?${qs({group_id: groupId, q: q || undefined, tag_id: tagId, from, to})}`)
+        .then(({items}): MonthTotal[] => items.map((r) => ({...r, spent: Math.round(Number(r.spent) * 100), received: Math.round(Number(r.received) * 100)})));
+
 export const createExpense = (d: ExpenseDraft) =>
     post<ApiExpense>("/expenses", {
         group_id: d.groupId, title: d.title, notes: d.notes, amount: (d.cents / 100).toFixed(2), date: d.date, tags: d.tags,

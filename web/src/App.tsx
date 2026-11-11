@@ -14,6 +14,7 @@ import {GroupDialog} from "./features/groups/GroupDialog.tsx";
 import {ProfilePage} from "./features/profile/ProfilePage.tsx";
 import {GroupPage} from "./features/groups/GroupPage.tsx";
 import {useStored} from "./lib/storage.ts";
+import {useMonthTotals} from "./lib/useMonthTotals.ts";
 import {usePaged} from "./lib/usePaged.ts";
 import {theme} from "./theme.ts";
 
@@ -44,6 +45,11 @@ function Main({onLogout}: { onLogout: () => void }) {
     const [toast, setToast] = useState("");
     const groups = usePaged((c) => groupsApi.listGroups(c), "groups");
     const expenses = usePaged((c) => expensesApi.listExpenses(open ?? undefined, query, tag ?? undefined, c), `${open ?? "all"}|${tag}|${query}`);
+    // month totals cover whole months, not just the loaded pages; fetched for the months on screen, refetched when one changes
+    const monthTotals = useMonthTotals(open ?? undefined, query, tag ?? undefined);
+    const monthsKey = [...new Set(expenses.items.map((e) => e.date.slice(0, 7)))].join();
+    const {load: loadMonths} = monthTotals;
+    useEffect(() => loadMonths(monthsKey ? monthsKey.split(",") : []), [loadMonths, monthsKey]);
     const [tags, setTags] = useState<Tag[]>([]); // the user's existing tags, offered as suggestions
     useEffect(() => {
         tagsApi.listTags().then(setTags, () => {
@@ -82,23 +88,27 @@ function Main({onLogout}: { onLogout: () => void }) {
                                      setProfile(false);
                                  }}/>
                 ) : (
-                    <GroupPage g={g} onQuery={setQuery} expenses={expenses.items} paging={expenses} tags={tagNames}
+                    <GroupPage g={g} months={monthTotals.rows} onQuery={setQuery} expenses={expenses.items} paging={expenses} tags={tagNames}
                                onAdd={(d) => expensesApi.createExpense(d).then((e) => {
                                    addTags(e);
                                    adjustGroup(e.groupId, 0, e.cents, 1);
                                    expenses.setItems((xs) => [e, ...xs]);
+                                   monthTotals.load([e.date.slice(0, 7)], true);
                                    setToast("Expense added");
                                })}
                                onEdit={(id, d) => expensesApi.updateExpense(id, d).then((e) => {
                                    addTags(e);
-                                   adjustGroup(e.groupId, expenses.items.find((x) => x.id === id)?.cents ?? e.cents, e.cents);
+                                   const old = expenses.items.find((x) => x.id === id);
+                                   adjustGroup(e.groupId, old?.cents ?? e.cents, e.cents);
                                    expenses.setItems((xs) => xs.map((x) => (x.id === id ? {...e, group: x.group} : x)));
+                                   monthTotals.load([...new Set([e.date.slice(0, 7), (old ?? e).date.slice(0, 7)])], true);
                                    setToast("Expense updated");
                                })}
                                onDelete={(id) => expensesApi.deleteExpense(id).then(() => {
                                    const gone = expenses.items.find((e) => e.id === id);
                                    if (gone) adjustGroup(gone.groupId, gone.cents, 0, -1);
                                    expenses.setItems((xs) => xs.filter((e) => e.id !== id));
+                                   if (gone) monthTotals.load([gone.date.slice(0, 7)], true);
                                    setToast("Expense deleted");
                                }, fail)}/>
                 )}
@@ -109,6 +119,7 @@ function Main({onLogout}: { onLogout: () => void }) {
                                               groups.setItems((xs) => xs.filter((x) => x.id !== groupDialog.id));
                                               expenses.setItems((xs) => xs.filter((x) => x.groupId !== groupDialog.id));
                                               if (open === groupDialog.id) setOpen(null);
+                                              if (open !== groupDialog.id && monthsKey) monthTotals.load(monthsKey.split(","), true);
                                               setGroupDialog(null);
                                               setToast("Group deleted");
                                           }} onSave={async (d) => {
