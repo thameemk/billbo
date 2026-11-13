@@ -12,9 +12,11 @@ import {GroupSidebar} from "./features/groups/GroupSidebar.tsx";
 import {NameDialog} from "./features/groups/NameDialog.tsx";
 import {GroupDialog} from "./features/groups/GroupDialog.tsx";
 import {ProfilePage} from "./features/profile/ProfilePage.tsx";
+import {Overview} from "./features/expenses/Overview.tsx";
 import {GroupPage} from "./features/groups/GroupPage.tsx";
 import {useStored} from "./lib/storage.ts";
 import {useMonthTotals} from "./lib/useMonthTotals.ts";
+import {shiftMonth, today} from "./lib/util.ts";
 import {usePaged} from "./lib/usePaged.ts";
 import {theme} from "./theme.ts";
 
@@ -55,6 +57,18 @@ function Main({onLogout}: { onLogout: () => void }) {
         tagsApi.listTags().then(setTags, () => {
         });
     }, []);
+    const [ym, setYm] = useState(() => today().slice(0, 7)); // month shown in the overview
+    const [ov, setOv] = useState<{ ym: string; groups: expensesApi.Breakdown[]; tags: expensesApi.Breakdown[]; prev: expensesApi.Breakdown[] }>();
+    const [stamp, setStamp] = useState(0); // bumped by any change that moves the totals
+    const overview = open === null && tag === null && !profile;
+    useEffect(() => {
+        if (!overview) return;
+        const range = (m: string) => [`${m}-01`, `${shiftMonth(m, 1)}-01`] as const;
+        Promise.all([expensesApi.overview(...range(ym)), expensesApi.overview(...range(shiftMonth(ym, -1)))])
+            .then(([cur, prev]) => setOv({ym, groups: cur.groups, tags: cur.tags, prev: prev.groups}), () => {
+            });
+    }, [overview, ym, stamp]);
+    const shown = ov?.ym === ym ? ov : undefined; // a month change drops the old figures at once
     const addTags = (e: Expense) => setTags((ts) => {
         const have = new Set(ts.map((t) => t.id));
         return [...ts, ...e.tags.filter((t) => !have.has(t.id))].sort((a, b) => a.name.localeCompare(b.name));
@@ -88,12 +102,16 @@ function Main({onLogout}: { onLogout: () => void }) {
                                      setProfile(false);
                                  }}/>
                 ) : (
+                    <>
+                    {overview && !query && shown && <Overview month={ym} onMonth={(n) => setYm((m) => shiftMonth(m, n))} canNext={ym < today().slice(0, 7)}
+                                                             groups={shown.groups} tags={shown.tags} prev={shown.prev} onGroup={(id) => setOpen(id)} onTag={setTag}/>}
                     <GroupPage g={g} months={monthTotals.rows} onQuery={setQuery} expenses={expenses.items} paging={expenses} tags={tagNames}
                                onAdd={(d) => expensesApi.createExpense(d).then((e) => {
                                    addTags(e);
                                    adjustGroup(e.groupId, 0, e.cents, 1);
                                    expenses.setItems((xs) => [e, ...xs]);
                                    monthTotals.load([e.date.slice(0, 7)], true);
+                                   setStamp((n) => n + 1);
                                    setToast("Expense added");
                                })}
                                onEdit={(id, d) => expensesApi.updateExpense(id, d).then((e) => {
@@ -102,6 +120,7 @@ function Main({onLogout}: { onLogout: () => void }) {
                                    adjustGroup(e.groupId, old?.cents ?? e.cents, e.cents);
                                    expenses.setItems((xs) => xs.map((x) => (x.id === id ? {...e, group: x.group} : x)));
                                    monthTotals.load([...new Set([e.date.slice(0, 7), (old ?? e).date.slice(0, 7)])], true);
+                                   setStamp((n) => n + 1);
                                    setToast("Expense updated");
                                })}
                                onDelete={(id) => expensesApi.deleteExpense(id).then(() => {
@@ -109,8 +128,10 @@ function Main({onLogout}: { onLogout: () => void }) {
                                    if (gone) adjustGroup(gone.groupId, gone.cents, 0, -1);
                                    expenses.setItems((xs) => xs.filter((e) => e.id !== id));
                                    if (gone) monthTotals.load([gone.date.slice(0, 7)], true);
+                                   setStamp((n) => n + 1);
                                    setToast("Expense deleted");
                                }, fail)}/>
+                    </>
                 )}
             </AppShell>
             {groupDialog && <GroupDialog group={groupDialog} onClose={() => setGroupDialog(null)}
@@ -121,6 +142,7 @@ function Main({onLogout}: { onLogout: () => void }) {
                                               if (open === groupDialog.id) setOpen(null);
                                               if (open !== groupDialog.id && monthsKey) monthTotals.load(monthsKey.split(","), true);
                                               setGroupDialog(null);
+                                              setStamp((n) => n + 1);
                                               setToast("Group deleted");
                                           }} onSave={async (d) => {
                 const saved = await groupsApi.updateGroup(groupDialog.id, d);
@@ -137,7 +159,9 @@ function Main({onLogout}: { onLogout: () => void }) {
                                           setTags((ts) => ts.filter((x) => x.id !== id));
                                           expenses.setItems((xs) => xs.map((x) => ({...x, tags: x.tags.filter((y) => y.id !== id)})));
                                           if (tag === id) setTag(null);
+                                          setStamp((n) => n + 1);
                                           setTagDialog(null);
+                                          setStamp((n) => n + 1);
                                           setToast("Tag deleted");
                                       } : undefined}
                                       onSave={async (name) => {
@@ -146,6 +170,7 @@ function Main({onLogout}: { onLogout: () => void }) {
                 setTags((ts) => [...ts.filter((x) => x.id !== saved.id), saved].sort((a, b) => a.name.localeCompare(b.name)));
                 // listed expenses still carry the old name
                 expenses.setItems((xs) => xs.map((x) => ({...x, tags: x.tags.map((y) => (y.id === saved.id ? saved : y))})));
+                setStamp((n) => n + 1);
                 setTagDialog(null);
             }}/>}
             {creating && <GroupDialog onClose={() => setCreating(false)} onSave={async (d) => {

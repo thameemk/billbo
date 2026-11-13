@@ -33,3 +33,14 @@ export const updateExpense = (id: string, d: ExpenseDraft) =>
     }).then(toExpense);
 
 export const deleteExpense = (id: string) => del(`/expenses/${id}`);
+
+// per-group and per-tag totals for [from, to), in cents; a tag has one row per currency
+export type Breakdown = { id: string; name: string; currency: string; spent: number; received: number; count: number };
+type ApiBreakdown = { id: string; name: string; currency: string; spent: string; received: string; expense_count: number };
+const toBreakdown = (b: ApiBreakdown): Breakdown => ({
+    id: b.id, name: b.name, currency: b.currency, count: b.expense_count,
+    spent: Math.round(Number(b.spent) * 100), received: Math.round(Number(b.received) * 100),
+});
+export const overview = (from: string, to: string) =>
+    get<{ groups: ApiBreakdown[]; tags: ApiBreakdown[] }>(`/expenses/overview?${qs({from, to})}`)
+        .then((r) => ({groups: r.groups.map(toBreakdown), tags: r.tags.map(toBreakdown)}));
