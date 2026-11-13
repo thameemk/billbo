@@ -16,6 +16,7 @@ from app.api.groups import GroupResponse, get_owned_group
 from app.api.tags import TagResponse
 from app.db.session import get_db
 from app.models import Expense, Group, Tag, User
+from app.models.expenses import expense_tags
 from app.utils.pagination import Page, paginate
 
 router = APIRouter(prefix="/api/v1/expenses", tags=["expenses"], responses=UNAUTHORIZED)
@@ -204,6 +205,62 @@ def monthly_totals(
             MonthTotal(month=m, currency=c, spent=s, received=r) for m, c, s, r in db.execute(stmt)
         ]
     }
+
+
+class Breakdown(BaseModel):
+    id: UUID
+    name: str
+    currency: str
+    spent: Decimal = Field(description="Sum of debits")
+    received: Decimal = Field(description="Sum of credits, as a positive number")
+    expense_count: int
+
+
+class Overview(BaseModel):
+    groups: list[Breakdown]
+    tags: list[Breakdown] = Field(description="One row per tag and currency")
+
+
+@router.get("/overview", response_model=Overview)
+def overview(
+    start: Date = Query(alias="from", description="Inclusive start date"),
+    end: Date = Query(alias="to", description="Exclusive end date"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Per-group and per-tag totals within [from, to); empty ones are left out."""
+    cols = (
+        Group.currency,
+        func.coalesce(func.sum(Expense.amount).filter(Expense.amount > 0), 0),
+        func.coalesce(-func.sum(Expense.amount).filter(Expense.amount < 0), 0),
+        func.count(),
+    )
+    base = (
+        select(*cols)
+        .select_from(Expense)
+        .join(Expense.group)
+        .where(Group.owner_id == user.id, Expense.date >= start, Expense.date < end)
+    )
+    groups = db.execute(
+        base.add_columns(Group.id, Group.name).group_by(Group.id, Group.name, Group.currency)
+    )
+    tags = db.execute(
+        base.join(expense_tags, expense_tags.c.expense_id == Expense.id)
+        .join(Tag, Tag.id == expense_tags.c.tag_id)
+        .add_columns(Tag.id, Tag.name)
+        .group_by(Tag.id, Tag.name, Group.currency)
+    )
+
+    def rows(result):
+        return sorted(
+            (
+                Breakdown(id=i, name=n, currency=c, spent=s, received=r, expense_count=k)
+                for c, s, r, k, i, n in result
+            ),
+            key=lambda b: (b.name.lower(), b.currency),
+        )
+
+    return {"groups": rows(groups), "tags": rows(tags)}
 
 
 def get_owned_expense(expense_id: UUID, user: User, db: Session) -> Expense:
