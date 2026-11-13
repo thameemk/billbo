@@ -6,17 +6,17 @@ from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, WithJsonSchema, field_validator
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session, contains_eager
+from sqlalchemy.orm import Session
 
 from app.api.dependencies import NOT_FOUND, UNAUTHORIZED, get_current_user
-from app.api.groups import GroupResponse, get_owned_group
+from app.api.groups import GroupResponse
 from app.api.tags import TagResponse
 from app.db.session import get_db
-from app.models import Expense, Group, Tag, User
-from app.utils.pagination import Page, paginate
+from app.models import Expense, User
+from app.services import expenses as svc
+from app.utils.pagination import Page
 
 router = APIRouter(prefix="/api/v1/expenses", tags=["expenses"], responses=UNAUTHORIZED)
 
@@ -61,15 +61,6 @@ class ExpenseUpdate(BaseModel):
         if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
             return tags
         return list(dict.fromkeys(t.strip().lower() for t in tags if t.strip()))
-
-
-def set_tags(expense: Expense, names: list[str], user: User, db: Session) -> None:
-    """Point the expense at the caller's tags with these names, creating the missing ones."""
-    found = {
-        t.name: t
-        for t in db.scalars(select(Tag).where(Tag.owner_id == user.id, Tag.name.in_(names)))
-    }
-    expense.tags = [found.get(n) or Tag(owner_id=user.id, name=n) for n in names]
 
 
 class ExpenseCreate(ExpenseUpdate):
@@ -119,31 +110,7 @@ def create_expense(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ExpenseResponse:
-    get_owned_group(payload.group_id, user, db)  # 404 unless it is the caller's group
-    expense = Expense(**payload.model_dump(exclude={"tags"}))
-    set_tags(expense, payload.tags, user, db)
-    db.add(expense)
-    db.commit()
-    return to_response(expense)
-
-
-def filtered(
-    stmt, group_id: UUID | None, tag_id: UUID | None, q: str | None, user: User, db: Session
-):
-    if group_id:
-        get_owned_group(group_id, user, db)  # 404 unless it is the caller's group
-    stmt = stmt.join(Expense.group).where(Group.owner_id == user.id)
-    if group_id:
-        stmt = stmt.where(Expense.group_id == group_id)
-    if tag_id:
-        stmt = stmt.where(Expense.tags.any(Tag.id == tag_id))
-    if q and q.strip():
-        q = q.strip()
-        stmt = stmt.where(
-            Expense.title.icontains(q, autoescape=True)
-            | Expense.tags.any(Tag.name.icontains(q, autoescape=True))
-        )
-    return stmt
+    return to_response(svc.create_expense(db, user, **payload.model_dump()))
 
 
 @router.get(
@@ -159,10 +126,16 @@ def list_expenses(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    stmt = filtered(select(Expense), group_id, tag_id, q, user, db)
-    if include:
-        stmt = stmt.options(contains_eager(Expense.group))
-    page = paginate(db, stmt, (Expense.date, Expense.created_at), Expense, cursor, limit)
+    page = svc.list_expenses(
+        db,
+        user,
+        group_id=group_id,
+        tag_id=tag_id,
+        q=q,
+        with_group=bool(include),
+        cursor=cursor,
+        limit=limit,
+    )
     page["items"] = [to_response(e, with_group=bool(include)) for e in page["items"]]
     return page
 
@@ -189,32 +162,44 @@ def monthly_totals(
     db: Session = Depends(get_db),
 ):
     """Per-month totals over everything the filters match within [from, to), not just a page."""
-    month = func.to_char(Expense.date, "YYYY-MM")
-    spent = func.coalesce(func.sum(Expense.amount).filter(Expense.amount > 0), 0)
-    received = func.coalesce(-func.sum(Expense.amount).filter(Expense.amount < 0), 0)
-    stmt = filtered(
-        select(month, Group.currency, spent, received), group_id, tag_id, q, user, db
-    ).group_by(month, Group.currency)
-    if start:
-        stmt = stmt.where(Expense.date >= start)
-    if end:
-        stmt = stmt.where(Expense.date < end)
-    return {
-        "items": [
-            MonthTotal(month=m, currency=c, spent=s, received=r) for m, c, s, r in db.execute(stmt)
-        ]
-    }
+    rows = svc.monthly_totals(db, user, group_id=group_id, tag_id=tag_id, q=q, start=start, end=end)
+    return {"items": [MonthTotal(month=m, currency=c, spent=s, received=r) for m, c, s, r in rows]}
 
 
-def get_owned_expense(expense_id: UUID, user: User, db: Session) -> Expense:
-    expense = db.scalar(
-        select(Expense)
-        .join(Expense.group)
-        .where(Expense.id == expense_id, Group.owner_id == user.id)
-    )
-    if expense is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
-    return expense
+class Breakdown(BaseModel):
+    id: UUID
+    name: str
+    currency: str
+    spent: Decimal = Field(description="Sum of debits")
+    received: Decimal = Field(description="Sum of credits, as a positive number")
+    expense_count: int
+
+
+class Overview(BaseModel):
+    groups: list[Breakdown]
+    tags: list[Breakdown] = Field(description="One row per tag and currency")
+
+
+@router.get("/overview", response_model=Overview)
+def overview(
+    start: Date = Query(alias="from", description="Inclusive start date"),
+    end: Date = Query(alias="to", description="Exclusive end date"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Per-group and per-tag totals within [from, to); empty ones are left out."""
+    groups, tags = svc.overview(db, user, start, end)
+
+    def rows(result):
+        return sorted(
+            (
+                Breakdown(id=i, name=n, currency=c, spent=s, received=r, expense_count=k)
+                for c, s, r, k, i, n in result
+            ),
+            key=lambda b: (b.name.lower(), b.currency),
+        )
+
+    return {"groups": rows(groups), "tags": rows(tags)}
 
 
 @router.put(
@@ -229,13 +214,8 @@ def update_expense(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ExpenseResponse:
-    expense = get_owned_expense(expense_id, user, db)
-    for field, value in payload.model_dump(exclude={"tags"}).items():
-        setattr(expense, field, value)
-    set_tags(expense, payload.tags, user, db)
-    expense.updated_at = func.now()  # onupdate alone misses tag-only edits
-    db.commit()
-    return to_response(expense)
+    expense = svc.get_owned_expense(db, expense_id, user)
+    return to_response(svc.update_expense(db, expense, user, **payload.model_dump()))
 
 
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT, responses=NOT_FOUND)
@@ -244,5 +224,4 @@ def delete_expense(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
-    db.delete(get_owned_expense(expense_id, user, db))
-    db.commit()
+    svc.delete_expense(db, svc.get_owned_expense(db, expense_id, user))

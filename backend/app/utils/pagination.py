@@ -6,10 +6,11 @@ import json
 from typing import Generic, TypeVar
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import Select, tuple_
 from sqlalchemy.orm import Session
+
+from app.core.errors import InvalidCursorError
 
 T = TypeVar("T")
 
@@ -37,7 +38,7 @@ def paginate(db: Session, stmt: Select, sort_cols: tuple, model, cursor: str | N
             )
             stmt = stmt.where(tuple_(*keys) < after)
         except ValueError, TypeError, binascii.Error:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid cursor") from None
+            raise InvalidCursorError("Invalid cursor") from None
     rows = list(db.scalars(stmt.order_by(*(k.desc() for k in keys)).limit(limit + 1)).all())
     next_cursor = None
     if len(rows) > limit:

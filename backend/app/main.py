@@ -8,6 +8,7 @@ from app.api.groups import router as groups_router
 from app.api.tags import router as tags_router
 from app.api.users import router as users_router
 from app.core.config import get_settings
+from app.core.errors import register_error_handlers
 
 api_version = version("billbo")
 settings = get_settings()
@@ -23,6 +24,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
+register_error_handlers(app)
 app.include_router(users_router)
 app.include_router(groups_router)
 app.include_router(expenses_router)
