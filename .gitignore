@@ -220,4 +220,5 @@ __marimo__/
 .streamlit/secrets.toml
 docs-temp/
 
-web/node_modules
+node_modules
+*.DS_Store
